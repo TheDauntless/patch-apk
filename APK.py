@@ -147,6 +147,7 @@ class APK:
                 fh.write(b'<?xml version="1.0" encoding="utf-8"?>'
                          b'<network-security-config>'
                          b'  <base-config>'
+                         b'    <certificateTransparency enabled="false"/>'
                          b'    <trust-anchors>'
                          b'      <certificates src="system" />'
                          b'      <certificates src="user" />'
