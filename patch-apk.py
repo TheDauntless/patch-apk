@@ -78,7 +78,8 @@ def choose_package(adb: ADBHelper, pattern: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="Pull, merge/patch, add gadget, build, align, sign, install.")
-    ap.add_argument("pkg_pattern", help="Package name or substring")
+    ap.add_argument("pkg_pattern", nargs="?", help="Package name or substring (omit when using --apk)")
+    ap.add_argument("--apk", help="Path to a local APK to patch (skips ADB pull/install, no device required)")
     ap.add_argument("--serial", help="adb -s <serial>")
     ap.add_argument("--user", default="0", help="Preferred user id (fallback to others if not found)")
     ap.add_argument("--gadget-version", default=None, help="Frida Gadget version (None = latest)")
@@ -98,28 +99,40 @@ def main():
 
     Log.verbose_enabled = args.verbose
 
+    if bool(args.pkg_pattern) == bool(args.apk):
+        ap.error("Specify either pkg_pattern or --apk (but not both).")
+
     if args.gadget_version and args.no_gadget:
         Log.abort("Cannot specify --gadget-version when --no-gadget is set.")
 
-    adb = ADBHelper(serial=args.serial)
-    pkg = choose_package(adb, args.pkg_pattern)
+    if args.apk:
+        if not os.path.isfile(args.apk):
+            Log.abort(f"APK file not found: {args.apk}")
+        adb = None
+        resolved_user = None
+        apk_paths = None
+        pkg = Path(args.apk).stem + "-patched"
+        args.no_install = True
+        Log.info(f"Using APK: {colored(args.apk, 'green')}")
+    else:
+        adb = ADBHelper(serial=args.serial)
+        pkg = choose_package(adb, args.pkg_pattern)
 
-    Log.info(f"Using package: {colored(pkg, 'green')}")
+        Log.info(f"Using package: {colored(pkg, 'green')}")
 
-    resolved_user, apk_paths = adb.get_apk_paths(pkg, user=args.user)
+        resolved_user, apk_paths = adb.get_apk_paths(pkg, user=args.user)
 
-    if not apk_paths:
-        Log.abort(f"No APK paths found for {pkg}")
-    
-    if resolved_user != args.user:
-        Log.warn(f"Requested user '{args.user}' not found for package; using user '{resolved_user}' instead.")
+        if not apk_paths:
+            Log.abort(f"No APK paths found for {pkg}")
+
+        if resolved_user != args.user:
+            Log.warn(f"Requested user '{args.user}' not found for package; using user '{resolved_user}' instead.")
     
     if not args.extract_only:
         Log.info("Fetching Frida gadgets")
         gadget_version = FridaGadget().obtain_gadgets(args.gadget_version)
         if not args.gadget_version:
             Log.warn(f"No Frida Gadget version specified; using latest available ({gadget_version}).")
-            Log.warn("Specify --gadget-version 16.7.19 for compatibility with objection")
 
         if args.gadget_version and gadget_version != args.gadget_version:
             Log.warn(f"Requested Frida Gadget version '{args.gadget_version}' not found; using '{gadget_version}' instead.")
@@ -128,10 +141,15 @@ def main():
     Log.verbose(f"APK paths: {apk_paths}")
 
     with tempfile.TemporaryDirectory(prefix="patchapk_") as tmp:
-        # Pull split(s) via ADBHelper
-        local_apks = adb.pull_files(apk_paths, tmp, pkg)
-
-        Log.info(f"Pulled {len(local_apks)} APK(s)")
+        if args.apk:
+            dst = os.path.join(tmp, os.path.basename(args.apk))
+            shutil.copyfile(args.apk, dst)
+            local_apks = [dst]
+            Log.info(f"Loaded {len(local_apks)} APK(s)")
+        else:
+            # Pull split(s) via ADBHelper
+            local_apks = adb.pull_files(apk_paths, tmp, pkg)
+            Log.info(f"Pulled {len(local_apks)} APK(s)")
 
         # Keep splits if requested
         if args.keep_splits:
