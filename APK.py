@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from pathlib import Path
 from typing import List, Optional
 from Log import Log
+from ErrorHandler import ErrorHandler
 from packaging.version import parse as parse_version
 
 # If you put FridaGadget.py next to this file, this import will work.
@@ -19,7 +20,7 @@ class APK:
    
     NULL_DECODED_DRAWABLE_COLOR = "#000000ff"
 
-    def __init__(self, apk_path: str, workdir: Optional[str] = None, verbose: bool = False):
+    def __init__(self, apk_path: str, workdir: Optional[str] = None, verbose: bool = False, fix_aggressive: bool = False):
         self.apk_path = os.path.abspath(apk_path)
         self.verbose = verbose
         self._check_exists(self.apk_path)
@@ -27,6 +28,7 @@ class APK:
         self.workdir = workdir or self._tmpbase.name
         Path(self.workdir).mkdir(parents=True, exist_ok=True)
         self.has_been_merged = False
+        self.error_handler = ErrorHandler(fix_aggressive)
 
     # ---------- Creation ----------
     @classmethod
@@ -232,8 +234,14 @@ class APK:
         Log.verbose(f"[apktool] {exe} {' '.join(args)}\n{cp.stdout}")
         if cp.returncode != 0:
             Log.verbose(cp.stderr)
-        if ok_required and cp.returncode != 0:
-            Log.abort(f"apktool failed: \n\n{exe}{' '.join(args)}\n\n" + cp.stdout +"\n\n---\n\n"+ cp.stderr)
+
+        while ok_required and cp.returncode != 0:
+            # Pass error to handler (action picked based on --fix-aggressive flag)
+            fixed = self.error_handler.handle(cp.stderr)
+            if fixed:
+                cp = subprocess.run([exe, *args], input="\r\n", text=True, capture_output=True)
+            else:
+                Log.abort(f"apktool failed: \n\n{exe}{' '.join(args)}\n\n" + cp.stdout +"\n\n---\n\n"+ cp.stderr)
 
     def _run(self, args: List[str], ok_required: bool = False):
         Log.verbose(f"[{args[0]}] {' '.join(args)}")
@@ -496,7 +504,7 @@ class APK:
                     r'(?m)^(\s*\.method\s+static\s+constructor\s+<clinit>\(\)V\s*$)',
                     r'\1\n    .registers 1',
                     clinit_block,
-                    count=1,
+                        count=1,
                 )
 
             # Insert the load instructions after the (possibly updated) .registers line.

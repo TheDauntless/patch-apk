@@ -94,6 +94,7 @@ def main():
     ap.add_argument("--no-install", action="store_true", help="Do not install to device at the end")
     ap.add_argument("--keep-splits", action="store_true", help="Keep split APKs when extracting")
     ap.add_argument("--save-apk", help="Copy final APK to this path")
+    ap.add_argument("--fix-aggressive", action="store_true", help="Attempt to fix known Apktool errors automatically")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -176,10 +177,10 @@ def main():
 
         if len(local_apks) == 1:
             Log.info("Single APK detected")
-            base = APK(local_apks[0])
+            base = APK(local_apks[0], fix_aggressive=args.fix_aggressive)
         else:
             Log.info(f"Split APK set detected ({len(local_apks)})")
-            apks = [APK(p) for p in local_apks]
+            apks = [APK(p, fix_aggressive=args.fix_aggressive) for p in local_apks]
 
             # Find base APK (heuristic: filename containing "base", else first)
             base = next((p for p in apks if "base.apk" in p.apk_path), apks[0])

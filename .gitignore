@@ -1,2 +1,3 @@
 .DS_Store
 .gadgetCache/
+__pycache__/
