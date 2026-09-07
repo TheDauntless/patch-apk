@@ -93,6 +93,8 @@ def main():
                     help="Skip duplicate <style><item> removal (merge step)")
     ap.add_argument("--no-install", action="store_true", help="Do not install to device at the end")
     ap.add_argument("--keep-splits", action="store_true", help="Keep split APKs when extracting")
+    ap.add_argument("-c", "--gadget-config", help="Path to Frida Gadget configuration JSON file")
+    ap.add_argument("-l", "--script-source", help="Path to a custom script to bundle with the gadget")
     ap.add_argument("--save-apk", help="Copy final APK to this path")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
@@ -104,6 +106,18 @@ def main():
 
     if args.gadget_version and args.no_gadget:
         Log.abort("Cannot specify --gadget-version when --no-gadget is set.")
+
+    if args.gadget_config and args.no_gadget:
+        Log.abort("Cannot specify --gadget-config when --no-gadget is set.")
+
+    if args.gadget_config and not os.path.isfile(args.gadget_config):
+        Log.abort(f"Gadget configuration file not found: {args.gadget_config}")
+
+    if args.script_source and not args.gadget_config:
+        Log.abort("A script source was specified (--script-source) but no gadget configuration was set (--gadget-config).")
+
+    if args.script_source and not os.path.isfile(args.script_source):
+        Log.abort(f"Script source file not found: {args.script_source}")
 
     if args.apk:
         if not os.path.isfile(args.apk):
@@ -202,8 +216,10 @@ def main():
         # Apply patches
         if not args.extract_only:
             base.apply_patches(version=gadget_version,
-                                enable_user_certs=not args.no_user_certs,
-                                frida_gadget=not args.no_gadget)
+                               enable_user_certs=not args.no_user_certs,
+                               frida_gadget=not args.no_gadget,
+                               gadget_config=args.gadget_config,
+                               script_source=args.script_source)
         # Build final APK
         base.assemble()
 
