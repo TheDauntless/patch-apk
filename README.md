@@ -12,6 +12,10 @@ An APK patcher, for use with [objection](https://github.com/sensepost/objection)
 
 ### Changelog
 
+* **7th September 2026:** 
+  * Added `-c` / `--gadget-config` parameter to provide custom Frida Gadget configuration JSON
+  * Added `-l` / `--script-source` parameter to bundle and run a custom Frida script with the gadget
+
 * **11th August 2026:** 
   * Added Certificate Transparency bypass for Android 17+
   * Added `--apk` parameter to load a local APK instead of pulling from device
@@ -48,7 +52,7 @@ Install the target Android application on your device and connect it to your com
 
 ```
 $ patch-apk.py -h
-usage: patch-apk.py [-h] [--serial SERIAL] [--user USER] [--gadget-version GADGET_VERSION] [--no-user-certs] [--no-gadget] [--extract-only] [--disable-styles-hack] [--no-install] [--keep-splits] [--save-apk SAVE_APK] [-v] pkg_pattern
+usage: patch-apk.py [-h] [--serial SERIAL] [--user USER] [--gadget-version GADGET_VERSION] [--no-user-certs] [--no-gadget] [--extract-only] [--disable-styles-hack] [--no-install] [--keep-splits] [-c GADGET_CONFIG] [-l SCRIPT_SOURCE] [--save-apk SAVE_APK] [-v] pkg_pattern
 
 Pull, merge/patch, add gadget, build, align, sign, install.
 
@@ -68,6 +72,10 @@ options:
                         Skip duplicate <style><item> removal (merge step)
   --no-install          Do not install to device at the end
   --keep-splits         Keep split APKs when extracting
+  -c, --gadget-config GADGET_CONFIG
+                        Path to Frida Gadget configuration JSON file
+  -l, --script-source SCRIPT_SOURCE
+                        Path to a custom script to bundle with the gadget
   --save-apk SAVE_APK   Copy final APK to this path
   -v, --verbose
 ```
@@ -186,6 +194,43 @@ $ python3 patch-apk.py org.proxydroid --extract-only
 [*] Disassembling split_config.xxxhdpi.apk with apktool
 [*] Merging split APKs into base
 [*] Saved APK: org.proxydroid.apk
+```
+
+**Custom Frida Gadget Configuration (`-c` / `--gadget-config`):**
+
+To provide custom Frida Gadget runtime parameters (e.g. listening address, interaction type, or loading scripts), pass a configuration JSON file using `-c`:
+
+```bash
+$ python3 patch-apk.py org.proxydroid -c gadget_config.json
+```
+
+Example `gadget_config.json`:
+```json
+{
+  "interaction": {
+    "type": "listen",
+    "address": "0.0.0.0",
+    "port": 27042,
+    "on_load": "resume"
+  }
+}
+```
+
+To automatically load and run an embedded Frida script, specify `--script-source` / `-l`:
+
+```bash
+$ python3 patch-apk.py org.proxydroid -c gadget_config.json -l hook.js
+```
+
+In your `gadget_config.json`, reference the script path as `libfrida-gadget.script.so`:
+```json
+{
+  "interaction": {
+    "type": "script",
+    "path": "libfrida-gadget.script.so",
+    "on_change": "rescan"
+  }
+}
 ```
 
 ## Original research
