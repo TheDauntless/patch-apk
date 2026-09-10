@@ -7,7 +7,7 @@ class ErrorHandler:
         self.fix_aggressive = fix_aggressive
 
     def handle(self, stderr: str) -> bool:
-        # Matches "attribue android:example not found" error
+        # Matches "attribute android:example not found" error
         namespace_error = re.compile(r"W:\s+(?P<path>.*?):\d+:\s+error:\s+attribute\s+android:(?P<attr>[^\s]+)\s+not found\.")
         matches = list(namespace_error.finditer(stderr))
         if matches:
@@ -25,6 +25,13 @@ class ErrorHandler:
         matches = list(incompatible_flags_error.finditer(stderr))
         if matches:
             self._handle_apktool_incompatible_flags(matches)
+            return True
+
+        # Matches "resource is private" error
+        private_resource_error = re.compile(r"W:\s+(?P<path>.*?):\d+:\s+error:\s+resource\s+android:(?P<attr>[^\s]+)\s+is private\.")
+        matches = list(private_resource_error.finditer(stderr))
+        if matches:
+            self._handle_apktool_private_resource(matches)
             return True
 
         return False
@@ -109,4 +116,28 @@ class ErrorHandler:
             except Exception as e:
                 Log.abort(e)
         Log.info(f"Removed {count} incompatible flags, restarting build")
+        return True
+
+    def _handle_apktool_private_resource(self, matches: List[Match]) -> bool:
+        Log.warn("Detected private resource error, this issue has no known fix on Apktool side and is likely caused by heavy obfuscation\nTo solve this, you can run patch-apk with --fix-aggressive")
+
+        if not self.fix_aggressive:
+            return False
+
+        Log.info("Trying to resolve automatically...")
+        count = 0
+        for m in matches:
+            path, attr = m.group("path"), m.group("attr")
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = f.read()
+                if data and f"@android:{attr}" in data:
+                    data = data.replace(f"@android:{attr}", f"@*android:{attr}")
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write(data)
+                    count += 1
+
+            except Exception as e:
+                Log.abort(e)
+        Log.info(f"Fixed {count} private resources, restarting build")
         return True
