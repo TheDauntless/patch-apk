@@ -84,7 +84,15 @@ class APK:
         apkdir = self.decoded
 
         manifest = os.path.join(apkdir, "AndroidManifest.xml")
-        tree = ET.parse(manifest)
+        try:
+            tree = ET.parse(manifest)
+        except ET.ParseError as e:
+            fixed = self.error_handler.handle_manifest(e, manifest)
+            if fixed:
+                tree = ET.parse(manifest)
+            else:
+                Log.abort(f"Manifest parsing error:\n{e}")
+
         # setup namespaces
         android_ns = self._manifest_ns(manifest)["android"]
 
@@ -394,7 +402,15 @@ class APK:
     def _disable_apk_splitting(self):
         base = self.decoded
         manifest = os.path.join(base, "AndroidManifest.xml")
-        tree = ET.parse(manifest)
+        try:
+            tree = ET.parse(manifest)
+        except ET.ParseError as e:
+            fixed = self.error_handler.handle_manifest(e, manifest)
+            if fixed:
+                tree = ET.parse(manifest)
+            else:
+                Log.abort(f"Manifest parsing error:\n{e}")
+
         nsmap = self._manifest_ns(manifest)
         android_ns = nsmap["android"]
         ns = "{" + android_ns + "}"

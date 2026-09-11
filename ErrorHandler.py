@@ -1,4 +1,4 @@
-import re, os
+import re, os, xml.etree.ElementTree as ET
 from typing import List, Match
 from Log import Log
 
@@ -141,3 +141,38 @@ class ErrorHandler:
                 Log.abort(e)
         Log.info(f"Fixed {count} private resources, restarting build")
         return True
+
+    def handle_manifest(self, e: ET.ParseError, manifest: str) -> bool:
+        duplicate_error = re.compile(r"duplicate attribute:")
+        if duplicate_error.search(str(e)):
+            return self._handle_manifest_duplicate(e, manifest)
+        return False
+
+    def _handle_manifest_duplicate(self, e: ET.ParseError, manifest: str) -> bool:
+        Log.warn(f"Detected duplicate attribute in manifest, this issue has no known fix and is likely caused by heavy obfuscation\nTo solve this, you can run patch-apk with --fix-aggressive")
+
+        if not self.fix_aggressive:
+            return False
+
+        Log.info("Trying to resolve automatically...")
+        line_no, _ = e.position
+
+        try:
+            with open(manifest, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            dup_pattern = re.compile(r'(\b([a-zA-Z0-9_:]+)="[^"]*")(.*?)\b\2="[^"]*"')
+            line = lines[line_no - 1]
+            if dup_pattern.search(line):
+                while dup_pattern.search(line):
+                    line = dup_pattern.sub(r"\1\3", line)
+                lines[line_no - 1] = line
+                with open(manifest, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+                Log.info("Removed duplicate attribute from manifest, retrying parse")
+                return True
+
+        except Exception as ex:
+            Log.abort(ex)
+
+        return False
