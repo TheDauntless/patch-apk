@@ -12,6 +12,11 @@ An APK patcher, for use with [objection](https://github.com/sensepost/objection)
 
 ### Changelog
 
+* **11th August 2026:** 
+  * Added Certificate Transparency bypass for Android 17+
+  * Added `--apk` parameter to load a local APK instead of pulling from device
+  * Removed objection Frida version warning
+
 * **29th June 2026:** 
   * Updated to work on windows
 
@@ -69,7 +74,7 @@ options:
 
 The package-name parameter can be the fully-qualified package name of the Android app, such as `com.google.android.youtube`, or a partial package name, such as `tube`.
 
-Along with injecting an instrumentation gadget, the script also automatically enables support for user-installed CA certificates by injecting a network security configuration file into the APK. To disable this functionality, pass the `--no-enable-user-certs` parameter on the command line.
+Along with injecting an instrumentation gadget, the script also automatically enables support for user-installed CA certificates by injecting a network security configuration file into the APK. The injected config also disables Certificate Transparency (`<certificateTransparency enabled="false"/>`) in the base config so that intercepted traffic is not rejected by CT enforcement. To disable this functionality, pass the `--no-enable-user-certs` parameter on the command line.
 
 ### Examples
 
