@@ -106,12 +106,16 @@ class FridaGadget:
         self,
         dest_root: Path | str,
         version: Optional[str] = None,
+        gadget_config: Optional[Path | str] = None,
+        script_source: Optional[Path | str] = None,
     ) -> List[Path]:
         """
         Copy cached gadgets into an APK-like layout under dest_root:
 
         dest_root/
             lib/<abi>/libfrida-gadget.so
+            lib/<abi>/libfrida-gadget.config.so (optional)
+            lib/<abi>/libfrida-gadget.script.so (optional)
 
         """
         dest_root = Path(dest_root).expanduser().resolve()
@@ -166,6 +170,20 @@ class FridaGadget:
             copied.append(dest_so)
             if self.verbose:
                 Log.info(f"Copied: {src_so} -> {dest_so}")
+
+            if gadget_config:
+                dest_config = dest_so_dir / "libfrida-gadget.config.so"
+                shutil.copyfile(gadget_config, dest_config)
+                copied.append(dest_config)
+                if self.verbose:
+                    Log.info(f"Copied config: {gadget_config} -> {dest_config}")
+
+            if script_source:
+                dest_script = dest_so_dir / "libfrida-gadget.script.so"
+                shutil.copyfile(script_source, dest_script)
+                copied.append(dest_script)
+                if self.verbose:
+                    Log.info(f"Copied script: {script_source} -> {dest_script}")
 
         if not any_found:
             Log.abort(f"No cached libfrida-gadget.so found under {tag_dir}")

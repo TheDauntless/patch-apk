@@ -77,7 +77,7 @@ class APK:
         self.apk_path = out_apk
         return out_apk
     
-    def apply_patches(self, version: Optional[str] = None, frida_gadget: bool = True, enable_user_certs: bool = True) -> str:
+    def apply_patches(self, version: Optional[str] = None, frida_gadget: bool = True, enable_user_certs: bool = True, gadget_config: Optional[str] = None, script_source: Optional[str] = None) -> str:
 
         apkdir = self.decoded
 
@@ -97,6 +97,10 @@ class APK:
 
         if frida_gadget:
             Log.info("Adding Frida gadget")
+            if gadget_config:
+                Log.info(f"Adding Frida gadget configuration: {gadget_config}")
+            if script_source:
+                Log.info(f"Adding Frida gadget script source: {script_source}")
             # Ensure INTERNET
             has_inet = any(el.tag == "uses-permission" and el.attrib.get(ns + "name") == "android.permission.INTERNET"
                         for el in root)
@@ -133,7 +137,7 @@ class APK:
             tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
             fg = FridaGadget()
-            fg.copy_android_gadgets(apkdir, version=version)
+            fg.copy_android_gadgets(apkdir, version=version, gadget_config=gadget_config, script_source=script_source)
         else:
             Log.warn("Not adding Frida Gadget.")
 
